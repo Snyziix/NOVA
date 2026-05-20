@@ -5,26 +5,28 @@ export default async function handler(req, res) {
 
   const { messages, system } = req.body;
 
+  const geminiMessages = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: system,
-        messages: messages
-      })
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: system }] },
+          contents: geminiMessages
+        })
+      }
+    );
 
     const data = await response.json();
-    const reply = data.content?.find(b => b.type === 'text')?.text || 'Erreur de réponse';
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Erreur de réponse.';
     res.status(200).json({ reply });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur', reply: 'Une erreur est survenue.' });
+    res.status(500).json({ reply: 'Une erreur est survenue.' });
   }
 }
